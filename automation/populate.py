@@ -1,0 +1,424 @@
+#!/usr/bin/env python3
+"""
+Populate NetBox with sample lab data for learning and training.
+
+Covers: Sites, Racks, Manufacturers, Device Types, Device Roles,
+        Devices, Interfaces, IP Addresses, Prefixes, VLANs, Cables.
+
+Usage:
+    python automation/populate.py              # Populate everything
+    python automation/populate.py --section sites   # Only sites
+    python automation/populate.py --clean           # Delete all created data
+"""
+
+import argparse
+import sys
+
+import pynetbox
+
+from config import NETBOX_URL, NETBOX_TOKEN
+
+nb = pynetbox.api(NETBOX_URL, token=NETBOX_TOKEN)
+
+
+# ---- Data Definitions -------------------------------------------------------
+
+REGIONS = [
+    {"name": "Asia Pacific", "slug": "apac"},
+    {"name": "North America", "slug": "na"},
+    {"name": "Europe", "slug": "eu"},
+]
+
+SITES = [
+    {"name": "Chennai DC1", "slug": "chennai-dc1", "status": "active",
+     "region": {"slug": "apac"}, "facility": "Equinix CH1",
+     "physical_address": "Chennai, India", "description": "Primary India datacenter"},
+    {"name": "Mumbai DC1", "slug": "mumbai-dc1", "status": "active",
+     "region": {"slug": "apac"}, "facility": "NTT Mumbai",
+     "physical_address": "Mumbai, India", "description": "Secondary India datacenter"},
+    {"name": "US-East DC1", "slug": "us-east-dc1", "status": "active",
+     "region": {"slug": "na"}, "facility": "Equinix DC5",
+     "physical_address": "Ashburn, VA, USA", "description": "US East datacenter"},
+    {"name": "London DC1", "slug": "london-dc1", "status": "planned",
+     "region": {"slug": "eu"}, "facility": "Telehouse North",
+     "physical_address": "London, UK", "description": "Planned EU datacenter"},
+]
+
+RACKS = [
+    {"name": "RACK-A01", "site": "chennai-dc1", "status": "active", "u_height": 42},
+    {"name": "RACK-A02", "site": "chennai-dc1", "status": "active", "u_height": 42},
+    {"name": "RACK-B01", "site": "mumbai-dc1", "status": "active", "u_height": 42},
+    {"name": "RACK-C01", "site": "us-east-dc1", "status": "active", "u_height": 48},
+]
+
+MANUFACTURERS = [
+    {"name": "Cisco", "slug": "cisco"},
+    {"name": "Arista", "slug": "arista"},
+    {"name": "Juniper", "slug": "juniper"},
+    {"name": "Dell", "slug": "dell"},
+    {"name": "Palo Alto", "slug": "palo-alto"},
+]
+
+DEVICE_TYPES = [
+    {"manufacturer": "cisco", "model": "Catalyst 9300-48P", "slug": "c9300-48p",
+     "u_height": 1, "is_full_depth": True},
+    {"manufacturer": "cisco", "model": "Nexus 9336C-FX2", "slug": "n9336c-fx2",
+     "u_height": 1, "is_full_depth": True},
+    {"manufacturer": "cisco", "model": "ASR 1001-X", "slug": "asr1001x",
+     "u_height": 1, "is_full_depth": True},
+    {"manufacturer": "arista", "model": "DCS-7050SX3-48YC12", "slug": "dcs-7050sx3",
+     "u_height": 1, "is_full_depth": True},
+    {"manufacturer": "juniper", "model": "EX4300-48T", "slug": "ex4300-48t",
+     "u_height": 1, "is_full_depth": True},
+    {"manufacturer": "dell", "model": "PowerEdge R750", "slug": "r750",
+     "u_height": 2, "is_full_depth": True},
+    {"manufacturer": "palo-alto", "model": "PA-3260", "slug": "pa-3260",
+     "u_height": 2, "is_full_depth": True},
+]
+
+DEVICE_ROLES = [
+    {"name": "Access Switch", "slug": "access-switch", "color": "2196f3"},
+    {"name": "Distribution Switch", "slug": "dist-switch", "color": "ff9800"},
+    {"name": "Core Router", "slug": "core-router", "color": "f44336"},
+    {"name": "Firewall", "slug": "firewall", "color": "9c27b0"},
+    {"name": "Server", "slug": "server", "color": "4caf50"},
+]
+
+DEVICES = [
+    {"name": "CHN-DC1-ACC-SW01", "site": "chennai-dc1", "rack": "RACK-A01",
+     "device_type": "c9300-48p", "role": "access-switch", "position": 1,
+     "face": "front", "status": "active"},
+    {"name": "CHN-DC1-ACC-SW02", "site": "chennai-dc1", "rack": "RACK-A01",
+     "device_type": "c9300-48p", "role": "access-switch", "position": 2,
+     "face": "front", "status": "active"},
+    {"name": "CHN-DC1-DIST-SW01", "site": "chennai-dc1", "rack": "RACK-A01",
+     "device_type": "n9336c-fx2", "role": "dist-switch", "position": 5,
+     "face": "front", "status": "active"},
+    {"name": "CHN-DC1-CORE-RTR01", "site": "chennai-dc1", "rack": "RACK-A01",
+     "device_type": "asr1001x", "role": "core-router", "position": 10,
+     "face": "front", "status": "active"},
+    {"name": "CHN-DC1-FW01", "site": "chennai-dc1", "rack": "RACK-A02",
+     "device_type": "pa-3260", "role": "firewall", "position": 1,
+     "face": "front", "status": "active"},
+    {"name": "CHN-DC1-SRV01", "site": "chennai-dc1", "rack": "RACK-A02",
+     "device_type": "r750", "role": "server", "position": 5,
+     "face": "front", "status": "active"},
+    {"name": "CHN-DC1-SRV02", "site": "chennai-dc1", "rack": "RACK-A02",
+     "device_type": "r750", "role": "server", "position": 7,
+     "face": "front", "status": "active"},
+    {"name": "MUM-DC1-ACC-SW01", "site": "mumbai-dc1", "rack": "RACK-B01",
+     "device_type": "dcs-7050sx3", "role": "access-switch", "position": 1,
+     "face": "front", "status": "active"},
+    {"name": "MUM-DC1-CORE-RTR01", "site": "mumbai-dc1", "rack": "RACK-B01",
+     "device_type": "ex4300-48t", "role": "core-router", "position": 5,
+     "face": "front", "status": "active"},
+    {"name": "USE-DC1-DIST-SW01", "site": "us-east-dc1", "rack": "RACK-C01",
+     "device_type": "n9336c-fx2", "role": "dist-switch", "position": 1,
+     "face": "front", "status": "active"},
+]
+
+VLANS = [
+    {"vid": 10, "name": "Management", "site": "chennai-dc1", "status": "active"},
+    {"vid": 20, "name": "Servers", "site": "chennai-dc1", "status": "active"},
+    {"vid": 30, "name": "Users", "site": "chennai-dc1", "status": "active"},
+    {"vid": 100, "name": "WAN-Transit", "site": "chennai-dc1", "status": "active"},
+    {"vid": 10, "name": "Management", "site": "mumbai-dc1", "status": "active"},
+    {"vid": 20, "name": "Servers", "site": "mumbai-dc1", "status": "active"},
+]
+
+PREFIXES = [
+    {"prefix": "10.0.0.0/8", "status": "container", "description": "Private RFC1918"},
+    {"prefix": "10.10.0.0/16", "status": "active", "site": "chennai-dc1",
+     "description": "Chennai DC1 supernet"},
+    {"prefix": "10.10.1.0/24", "status": "active", "site": "chennai-dc1",
+     "vlan": {"vid": 10, "site": "chennai-dc1"}, "description": "Management VLAN"},
+    {"prefix": "10.10.2.0/24", "status": "active", "site": "chennai-dc1",
+     "vlan": {"vid": 20, "site": "chennai-dc1"}, "description": "Server VLAN"},
+    {"prefix": "10.10.3.0/24", "status": "active", "site": "chennai-dc1",
+     "vlan": {"vid": 30, "site": "chennai-dc1"}, "description": "User VLAN"},
+    {"prefix": "10.20.0.0/16", "status": "active", "site": "mumbai-dc1",
+     "description": "Mumbai DC1 supernet"},
+    {"prefix": "10.20.1.0/24", "status": "active", "site": "mumbai-dc1",
+     "description": "Management VLAN"},
+    {"prefix": "10.30.0.0/16", "status": "active", "site": "us-east-dc1",
+     "description": "US-East DC1 supernet"},
+]
+
+IP_ADDRESSES = [
+    {"address": "10.10.1.1/24", "status": "active", "device": "CHN-DC1-CORE-RTR01",
+     "interface": "GigabitEthernet0/0/0", "description": "Core router mgmt"},
+    {"address": "10.10.1.2/24", "status": "active", "device": "CHN-DC1-DIST-SW01",
+     "interface": "Management0", "description": "Dist switch mgmt"},
+    {"address": "10.10.1.3/24", "status": "active", "device": "CHN-DC1-ACC-SW01",
+     "interface": "Vlan10", "description": "Access switch 1 mgmt"},
+    {"address": "10.10.1.4/24", "status": "active", "device": "CHN-DC1-ACC-SW02",
+     "interface": "Vlan10", "description": "Access switch 2 mgmt"},
+    {"address": "10.10.1.5/24", "status": "active", "device": "CHN-DC1-FW01",
+     "interface": "ethernet1/1", "description": "Firewall mgmt"},
+    {"address": "10.10.2.10/24", "status": "active", "device": "CHN-DC1-SRV01",
+     "interface": "eno1", "description": "Server 1"},
+    {"address": "10.10.2.11/24", "status": "active", "device": "CHN-DC1-SRV02",
+     "interface": "eno1", "description": "Server 2"},
+    {"address": "10.20.1.1/24", "status": "active", "device": "MUM-DC1-CORE-RTR01",
+     "interface": "ge-0/0/0", "description": "Mumbai core router mgmt"},
+]
+
+
+# ---- Helper functions --------------------------------------------------------
+
+def get_or_create(endpoint, lookup, data):
+    """Create an object if it doesn't exist, otherwise return existing."""
+    existing = endpoint.filter(**lookup)
+    if existing:
+        obj = list(existing)[0]
+        print(f"  EXISTS: {obj}")
+        return obj
+    obj = endpoint.create(data)
+    print(f"  CREATED: {obj}")
+    return obj
+
+
+def resolve_id(endpoint, **lookup):
+    """Look up an object and return its ID."""
+    results = list(endpoint.filter(**lookup))
+    if results:
+        return results[0].id
+    return None
+
+
+# ---- Population functions ----------------------------------------------------
+
+def populate_regions():
+    print("\n--- Regions ---")
+    for region in REGIONS:
+        get_or_create(nb.dcim.regions, {"slug": region["slug"]}, region)
+
+
+def populate_sites():
+    print("\n--- Sites ---")
+    for site in SITES:
+        data = dict(site)
+        region_info = data.pop("region", None)
+        if region_info:
+            data["region"] = resolve_id(nb.dcim.regions, slug=region_info["slug"])
+        get_or_create(nb.dcim.sites, {"slug": data["slug"]}, data)
+
+
+def populate_racks():
+    print("\n--- Racks ---")
+    for rack in RACKS:
+        data = dict(rack)
+        data["site"] = resolve_id(nb.dcim.sites, slug=data.pop("site"))
+        get_or_create(nb.dcim.racks, {"name": data["name"], "site_id": data["site"]}, data)
+
+
+def populate_manufacturers():
+    print("\n--- Manufacturers ---")
+    for mfr in MANUFACTURERS:
+        get_or_create(nb.dcim.manufacturers, {"slug": mfr["slug"]}, mfr)
+
+
+def populate_device_types():
+    print("\n--- Device Types ---")
+    for dt in DEVICE_TYPES:
+        data = dict(dt)
+        data["manufacturer"] = resolve_id(nb.dcim.manufacturers, slug=data.pop("manufacturer"))
+        get_or_create(nb.dcim.device_types, {"slug": data["slug"]}, data)
+
+
+def populate_device_roles():
+    print("\n--- Device Roles ---")
+    for role in DEVICE_ROLES:
+        get_or_create(nb.dcim.device_roles, {"slug": role["slug"]}, role)
+
+
+def populate_devices():
+    print("\n--- Devices ---")
+    for device in DEVICES:
+        data = dict(device)
+        data["site"] = resolve_id(nb.dcim.sites, slug=data.pop("site"))
+        data["device_type"] = resolve_id(nb.dcim.device_types, slug=data.pop("device_type"))
+        data["role"] = resolve_id(nb.dcim.device_roles, slug=data.pop("role"))
+        rack_name = data.pop("rack", None)
+        if rack_name:
+            data["rack"] = resolve_id(nb.dcim.racks, name=rack_name)
+        get_or_create(nb.dcim.devices, {"name": data["name"]}, data)
+
+
+def populate_vlans():
+    print("\n--- VLANs ---")
+    for vlan in VLANS:
+        data = dict(vlan)
+        site_slug = data.pop("site", None)
+        if site_slug:
+            data["site"] = resolve_id(nb.dcim.sites, slug=site_slug)
+        get_or_create(
+            nb.ipam.vlans,
+            {"vid": data["vid"], "site_id": data.get("site")},
+            data,
+        )
+
+
+def populate_prefixes():
+    print("\n--- Prefixes ---")
+    for prefix in PREFIXES:
+        data = dict(prefix)
+        site_slug = data.pop("site", None)
+        if site_slug:
+            data["site"] = resolve_id(nb.dcim.sites, slug=site_slug)
+        vlan_info = data.pop("vlan", None)
+        if vlan_info:
+            site_id = resolve_id(nb.dcim.sites, slug=vlan_info["site"])
+            data["vlan"] = resolve_id(nb.ipam.vlans, vid=vlan_info["vid"], site_id=site_id)
+        get_or_create(nb.ipam.prefixes, {"prefix": data["prefix"]}, data)
+
+
+def populate_ip_addresses():
+    print("\n--- IP Addresses & Interfaces ---")
+    for ip in IP_ADDRESSES:
+        data = dict(ip)
+        device_name = data.pop("device")
+        iface_name = data.pop("interface")
+
+        device = nb.dcim.devices.get(name=device_name)
+        if not device:
+            print(f"  SKIP: device {device_name} not found")
+            continue
+
+        # Create interface if it doesn't exist
+        iface = get_or_create(
+            nb.dcim.interfaces,
+            {"device_id": device.id, "name": iface_name},
+            {"device": device.id, "name": iface_name, "type": "1000base-t"},
+        )
+
+        # Create IP and assign to interface
+        data["assigned_object_type"] = "dcim.interface"
+        data["assigned_object_id"] = iface.id
+        get_or_create(nb.ipam.ip_addresses, {"address": data["address"]}, data)
+
+
+# ---- Main -------------------------------------------------------------------
+
+SECTIONS = {
+    "regions": populate_regions,
+    "sites": populate_sites,
+    "racks": populate_racks,
+    "manufacturers": populate_manufacturers,
+    "device_types": populate_device_types,
+    "device_roles": populate_device_roles,
+    "devices": populate_devices,
+    "vlans": populate_vlans,
+    "prefixes": populate_prefixes,
+    "ip_addresses": populate_ip_addresses,
+}
+
+# Ordered list for full population (dependencies matter)
+SECTION_ORDER = [
+    "regions", "sites", "racks", "manufacturers", "device_types",
+    "device_roles", "devices", "vlans", "prefixes", "ip_addresses",
+]
+
+
+def clean_all():
+    """Delete all objects created by this script (reverse order)."""
+    print("\n=== Cleaning up all lab data ===")
+    for ip in IP_ADDRESSES:
+        existing = nb.ipam.ip_addresses.filter(address=ip["address"])
+        for obj in existing:
+            obj.delete()
+            print(f"  DELETED IP: {ip['address']}")
+
+    for prefix in reversed(PREFIXES):
+        existing = nb.ipam.prefixes.filter(prefix=prefix["prefix"])
+        for obj in existing:
+            obj.delete()
+            print(f"  DELETED prefix: {prefix['prefix']}")
+
+    for vlan in VLANS:
+        site_id = resolve_id(nb.dcim.sites, slug=vlan["site"])
+        existing = nb.ipam.vlans.filter(vid=vlan["vid"], site_id=site_id)
+        for obj in existing:
+            obj.delete()
+            print(f"  DELETED VLAN: {vlan['name']}")
+
+    for device in DEVICES:
+        existing = nb.dcim.devices.filter(name=device["name"])
+        for obj in existing:
+            obj.delete()
+            print(f"  DELETED device: {device['name']}")
+
+    for role in DEVICE_ROLES:
+        existing = nb.dcim.device_roles.filter(slug=role["slug"])
+        for obj in existing:
+            obj.delete()
+            print(f"  DELETED role: {role['name']}")
+
+    for dt in DEVICE_TYPES:
+        existing = nb.dcim.device_types.filter(slug=dt["slug"])
+        for obj in existing:
+            obj.delete()
+            print(f"  DELETED device type: {dt['model']}")
+
+    for mfr in MANUFACTURERS:
+        existing = nb.dcim.manufacturers.filter(slug=mfr["slug"])
+        for obj in existing:
+            obj.delete()
+            print(f"  DELETED manufacturer: {mfr['name']}")
+
+    for rack in RACKS:
+        site_id = resolve_id(nb.dcim.sites, slug=rack["site"])
+        existing = nb.dcim.racks.filter(name=rack["name"], site_id=site_id)
+        for obj in existing:
+            obj.delete()
+            print(f"  DELETED rack: {rack['name']}")
+
+    for site in SITES:
+        existing = nb.dcim.sites.filter(slug=site["slug"])
+        for obj in existing:
+            obj.delete()
+            print(f"  DELETED site: {site['name']}")
+
+    for region in REGIONS:
+        existing = nb.dcim.regions.filter(slug=region["slug"])
+        for obj in existing:
+            obj.delete()
+            print(f"  DELETED region: {region['name']}")
+
+    print("\n[OK] Cleanup complete")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Populate NetBox with sample lab data")
+    parser.add_argument("--section", choices=list(SECTIONS.keys()),
+                        help="Populate only a specific section")
+    parser.add_argument("--clean", action="store_true",
+                        help="Delete all lab data from NetBox")
+    args = parser.parse_args()
+
+    print(f"Connecting to NetBox at {NETBOX_URL}...")
+    try:
+        status = nb.status()
+        print(f"NetBox version: {status.get('netbox-version', 'unknown')}")
+    except Exception as e:
+        print(f"ERROR: Cannot connect to NetBox: {e}")
+        print("Is NetBox running? Try: cd netbox-docker && docker compose up -d")
+        sys.exit(1)
+
+    if args.clean:
+        clean_all()
+        return
+
+    if args.section:
+        SECTIONS[args.section]()
+    else:
+        print("\n=== Populating all lab data ===")
+        for section in SECTION_ORDER:
+            SECTIONS[section]()
+
+    print("\n=== Population complete! ===")
+    print(f"Open {NETBOX_URL} to explore your data.")
+
+
+if __name__ == "__main__":
+    main()

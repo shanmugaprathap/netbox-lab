@@ -1,0 +1,5 @@
+name,slug,status,facility,physical_address,description
+Chennai DC1,chennai-dc1,active,Equinix CH1,"Chennai, India",Primary India datacenter
+Mumbai DC1,mumbai-dc1,active,NTT Mumbai,"Mumbai, India",Secondary India datacenter
+US-East DC1,us-east-dc1,active,Equinix DC5,"Ashburn, VA, USA",US East datacenter
+London DC1,london-dc1,planned,Telehouse North,"London, UK",Planned EU datacenter

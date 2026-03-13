@@ -1,0 +1,6 @@
+netbox-docker/
+.venv/
+__pycache__/
+*.pyc
+.env
+status.json
