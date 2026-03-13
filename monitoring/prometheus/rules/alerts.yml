@@ -1,0 +1,151 @@
+groups:
+  - name: container_alerts
+    rules:
+      # Container restarted in the last 5 minutes
+      - alert: ContainerRestarted
+        expr: time() - container_start_time_seconds{name=~"netbox-docker.*"} < 300
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} restarted"
+          description: "Container {{ $labels.name }} was restarted less than 5 minutes ago."
+
+      # Container using more than 80% of its memory limit
+      - alert: ContainerHighMemory
+        expr: |
+          (container_memory_usage_bytes{name=~"netbox-docker.*"}
+          / container_spec_memory_limit_bytes{name=~"netbox-docker.*"}) * 100 > 80
+          and container_spec_memory_limit_bytes{name=~"netbox-docker.*"} > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.name }}"
+          description: "Container {{ $labels.name }} memory usage is above 80% (current: {{ $value | printf \"%.1f\" }}%)."
+
+      # Container memory usage above 500MB (absolute threshold)
+      - alert: ContainerMemoryAbsolute
+        expr: container_memory_usage_bytes{name=~"netbox-docker.*"} > 500 * 1024 * 1024
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} using >500MB memory"
+          description: "Container {{ $labels.name }} is using {{ $value | humanize }} of memory."
+
+      # Container CPU sustained above 80%
+      - alert: ContainerHighCPU
+        expr: rate(container_cpu_usage_seconds_total{name=~"netbox-docker.*"}[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.name }}"
+          description: "Container {{ $labels.name }} CPU usage is above 80% for 5 minutes."
+
+      # Container stopped (was running, now gone)
+      - alert: ContainerDown
+        expr: absent(container_last_seen{name=~"netbox-docker-netbox-1"}) or (time() - container_last_seen{name=~"netbox-docker-netbox-1"}) > 60
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "NetBox container is down"
+          description: "The NetBox container has not been seen for more than 60 seconds."
+
+  - name: postgres_alerts
+    rules:
+      # Too many PostgreSQL connections
+      - alert: PostgresTooManyConnections
+        expr: pg_stat_activity_count > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL has too many connections"
+          description: "PostgreSQL currently has {{ $value }} active connections."
+
+      # PostgreSQL is down
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL exporter cannot connect to the database."
+
+      # Slow queries — queries running longer than 5 minutes
+      - alert: PostgresSlowQueries
+        expr: pg_stat_activity_max_tx_duration{datname="netbox"} > 300
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Long-running PostgreSQL query detected"
+          description: "A query has been running for more than 5 minutes in the netbox database."
+
+      # Database size growing rapidly (>10% in 1 hour)
+      - alert: PostgresDatabaseGrowth
+        expr: rate(pg_database_size_bytes{datname="netbox"}[1h]) > 0.1 * pg_database_size_bytes{datname="netbox"}
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "NetBox database growing rapidly"
+          description: "The NetBox database size is increasing faster than 10% per hour."
+
+  - name: redis_alerts
+    rules:
+      # Redis is down
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis exporter cannot connect to the Redis instance."
+
+      # Redis memory usage above 256MB
+      - alert: RedisHighMemory
+        expr: redis_memory_used_bytes > 256 * 1024 * 1024
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis is using {{ $value | humanize }} of memory."
+
+      # Redis connected clients spike
+      - alert: RedisHighClients
+        expr: redis_connected_clients > 100
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis has too many connected clients"
+          description: "Redis currently has {{ $value }} connected clients."
+
+      # Redis rejected connections
+      - alert: RedisRejectedConnections
+        expr: increase(redis_rejected_connections_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis is rejecting connections"
+          description: "Redis has rejected {{ $value }} connections in the last 5 minutes."
+
+  - name: scrape_alerts
+    rules:
+      # Any scrape target is down
+      - alert: TargetDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Scrape target {{ $labels.job }} is down"
+          description: "Prometheus cannot scrape {{ $labels.instance }} (job: {{ $labels.job }})."

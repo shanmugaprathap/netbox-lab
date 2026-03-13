@@ -1,0 +1,35 @@
+[
+  {
+    "targets": [
+      "10.1.1.1:9100"
+    ],
+    "labels": {
+      "job": "netbox-devices",
+      "device": "CHN-RTR-01",
+      "site": "chennai-dc1",
+      "role": "router"
+    }
+  },
+  {
+    "targets": [
+      "10.2.1.1:9100"
+    ],
+    "labels": {
+      "job": "netbox-devices",
+      "device": "MUM-RTR-01",
+      "site": "mumbai-dc1",
+      "role": "router"
+    }
+  },
+  {
+    "targets": [
+      "10.3.1.1:9100"
+    ],
+    "labels": {
+      "job": "netbox-devices",
+      "device": "USE-RTR-01",
+      "site": "us-east-dc1",
+      "role": "router"
+    }
+  }
+]
