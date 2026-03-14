@@ -1,0 +1,41 @@
+============================================
+  NetBox Lab on Kubernetes is ready!
+============================================
+
+{{- if eq .Values.netbox.service.type "NodePort" }}
+
+  NetBox UI:
+    Run: minikube service {{ include "netbox-lab.fullname" . }}-netbox -n {{ .Release.Namespace }}
+    Or:  kubectl port-forward svc/{{ include "netbox-lab.fullname" . }}-netbox {{ .Values.netbox.service.port }}:{{ .Values.netbox.service.port }} -n {{ .Release.Namespace }}
+
+{{- else if .Values.netbox.ingress.enabled }}
+
+  NetBox UI:
+  {{- range .Values.netbox.ingress.hosts }}
+    http{{ if $.Values.netbox.ingress.tls }}s{{ end }}://{{ .host }}
+  {{- end }}
+
+{{- else }}
+
+  NetBox UI:
+    kubectl port-forward svc/{{ include "netbox-lab.fullname" . }}-netbox 8080:{{ .Values.netbox.service.port }} -n {{ .Release.Namespace }}
+    Then open: http://localhost:8080
+
+{{- end }}
+
+  Login:     {{ .Values.netbox.superuser.name }} / {{ .Values.netbox.superuser.password }}
+  API Token: {{ .Values.netbox.superuser.apiToken }}
+
+  Grafana:
+    kubectl port-forward svc/{{ .Release.Name }}-grafana 3000:80 -n {{ .Release.Namespace }}
+    Login: {{ index .Values "kube-prometheus-stack" "grafana" "adminUser" }} / {{ index .Values "kube-prometheus-stack" "grafana" "adminPassword" }}
+
+  Prometheus:
+    kubectl port-forward svc/{{ .Release.Name }}-kube-prometheus-stack-prometheus 9090:9090 -n {{ .Release.Namespace }}
+
+  Check pod status:
+    kubectl get pods -n {{ .Release.Namespace }}
+
+  Re-run data population:
+    kubectl delete job {{ include "netbox-lab.fullname" . }}-populate -n {{ .Release.Namespace }} --ignore-not-found
+    helm upgrade {{ .Release.Name }} ./netbox-chart -n {{ .Release.Namespace }}

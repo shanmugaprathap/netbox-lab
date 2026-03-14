@@ -1,0 +1,29 @@
+apiVersion: v2
+name: netbox-lab
+description: NetBox CMDB lab with full monitoring stack (Prometheus, Grafana)
+type: application
+version: 0.1.0
+appVersion: "v4.5"
+
+dependencies:
+  - name: postgresql
+    version: "~16.x"
+    repository: oci://registry-1.docker.io/bitnamicharts
+    condition: postgresql.enabled
+
+  - name: redis
+    alias: redis-tasks
+    version: "~20.x"
+    repository: oci://registry-1.docker.io/bitnamicharts
+    condition: redis-tasks.enabled
+
+  - name: redis
+    alias: redis-cache
+    version: "~20.x"
+    repository: oci://registry-1.docker.io/bitnamicharts
+    condition: redis-cache.enabled
+
+  - name: kube-prometheus-stack
+    version: "~68.x"
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: kube-prometheus-stack.enabled

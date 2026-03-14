@@ -1,0 +1,160 @@
+{{- if index .Values "kube-prometheus-stack" "enabled" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "netbox-lab.fullname" . }}-grafana-dashboard
+  labels:
+    {{- include "netbox-lab.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  netbox-infrastructure.json: |-
+    {
+      "annotations": { "list": [] },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "title": "Pod CPU Usage",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "targets": [
+            {
+              "expr": "rate(container_cpu_usage_seconds_total{namespace=\"{{ .Release.Namespace }}\", container=~\"netbox|worker|postgresql|redis\"}[5m]) * 100",
+              "legendFormat": "{{ "{{" }}pod{{ "}}" }} / {{ "{{" }}container{{ "}}" }}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "custom": { "drawStyle": "line", "fillOpacity": 10 }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "title": "Pod Memory Usage",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "targets": [
+            {
+              "expr": "container_memory_working_set_bytes{namespace=\"{{ .Release.Namespace }}\", container=~\"netbox|worker|postgresql|redis\"} / 1024 / 1024",
+              "legendFormat": "{{ "{{" }}pod{{ "}}" }} / {{ "{{" }}container{{ "}}" }}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "MiB",
+              "custom": { "drawStyle": "line", "fillOpacity": 10 }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "title": "Pod Network I/O",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "targets": [
+            {
+              "expr": "rate(container_network_receive_bytes_total{namespace=\"{{ .Release.Namespace }}\", pod=~\".*netbox.*|.*postgresql.*|.*redis.*\"}[5m])",
+              "legendFormat": "{{ "{{" }}pod{{ "}}" }} RX"
+            },
+            {
+              "expr": "rate(container_network_transmit_bytes_total{namespace=\"{{ .Release.Namespace }}\", pod=~\".*netbox.*|.*postgresql.*|.*redis.*\"}[5m])",
+              "legendFormat": "{{ "{{" }}pod{{ "}}" }} TX"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "Bps",
+              "custom": { "drawStyle": "line", "fillOpacity": 10 }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "title": "PostgreSQL Connections",
+          "type": "stat",
+          "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "targets": [
+            {
+              "expr": "pg_stat_activity_count",
+              "legendFormat": "Active connections"
+            }
+          ]
+        },
+        {
+          "title": "Redis Connected Clients",
+          "type": "stat",
+          "gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "targets": [
+            {
+              "expr": "redis_connected_clients",
+              "legendFormat": "Clients"
+            }
+          ]
+        },
+        {
+          "title": "Pod Restarts",
+          "type": "table",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "targets": [
+            {
+              "expr": "kube_pod_container_status_restarts_total{namespace=\"{{ .Release.Namespace }}\"}",
+              "legendFormat": "{{ "{{" }}pod{{ "}}" }} / {{ "{{" }}container{{ "}}" }}",
+              "format": "table",
+              "instant": true
+            }
+          ]
+        },
+        {
+          "title": "Pod Disk I/O",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "targets": [
+            {
+              "expr": "rate(container_fs_reads_bytes_total{namespace=\"{{ .Release.Namespace }}\", container=~\"netbox|worker|postgresql|redis\"}[5m])",
+              "legendFormat": "{{ "{{" }}pod{{ "}}" }} read"
+            },
+            {
+              "expr": "rate(container_fs_writes_bytes_total{namespace=\"{{ .Release.Namespace }}\", container=~\"netbox|worker|postgresql|redis\"}[5m])",
+              "legendFormat": "{{ "{{" }}pod{{ "}}" }} write"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "Bps",
+              "custom": { "drawStyle": "line", "fillOpacity": 10 }
+            },
+            "overrides": []
+          }
+        }
+      ],
+      "schemaVersion": 39,
+      "templating": {
+        "list": [
+          {
+            "current": {},
+            "hide": 0,
+            "includeAll": false,
+            "name": "DS_PROMETHEUS",
+            "options": [],
+            "query": "prometheus",
+            "type": "datasource"
+          }
+        ]
+      },
+      "time": { "from": "now-1h", "to": "now" },
+      "title": "NetBox Infrastructure",
+      "uid": "netbox-infra-k8s"
+    }
+{{- end }}

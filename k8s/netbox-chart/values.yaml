@@ -1,0 +1,162 @@
+# =============================================================================
+# NetBox Lab - Helm Values (Default)
+# =============================================================================
+
+# -- NetBox Application -------------------------------------------------------
+netbox:
+  image:
+    repository: docker.io/netboxcommunity/netbox
+    tag: v4.5-4.0.1
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+
+  service:
+    type: ClusterIP
+    port: 8080
+
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    hosts:
+      - host: netbox.local
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  # Superuser created on first start
+  superuser:
+    name: admin
+    email: admin@example.com
+    password: admin
+    apiToken: "0123456789abcdef0123456789abcdef01234567"
+
+  # Secret key for cryptographic signing
+  secretKey: 'r(m)9nLGnz$(_q3N4z1k(EFsMCjjjzx08x9VhNVcfd%6RF#r!6DE@+V5Zk2X'
+  apiTokenPepper: 'Qy+F=OTeGskWQ(wTMgjc+NPPlz6YwFXY=KHIIg=wpYXT&e(6u8'
+
+  # Non-secret environment variables
+  env:
+    CORS_ORIGIN_ALLOW_ALL: "True"
+    GRAPHQL_ENABLED: "true"
+    WEBHOOKS_ENABLED: "true"
+    METRICS_ENABLED: "false"
+    GRANIAN_WORKERS: "4"
+    GRANIAN_BACKPRESSURE: "4"
+    SKIP_SUPERUSER: "false"
+    ALLOWED_HOSTS: "*"
+
+  # Health check configuration
+  healthcheck:
+    path: /login/
+    initialDelaySeconds: 90
+    periodSeconds: 15
+    timeoutSeconds: 3
+
+  # Persistent volumes for media, reports, scripts
+  persistence:
+    media:
+      size: 5Gi
+      storageClass: ""
+    reports:
+      size: 1Gi
+      storageClass: ""
+    scripts:
+      size: 1Gi
+      storageClass: ""
+
+# -- NetBox Worker (RQ) -------------------------------------------------------
+worker:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# -- PostgreSQL (Bitnami subchart) ---------------------------------------------
+postgresql:
+  enabled: true
+  auth:
+    database: netbox
+    username: netbox
+    password: J5brHrAXFLQSif0K
+  primary:
+    persistence:
+      size: 10Gi
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# -- Redis Tasks (Bitnami subchart) -------------------------------------------
+redis-tasks:
+  enabled: true
+  auth:
+    password: H733Kdjndks81
+  master:
+    persistence:
+      enabled: true
+      size: 2Gi
+    configuration: "appendonly yes"
+  replica:
+    replicaCount: 0
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# -- Redis Cache (Bitnami subchart) -------------------------------------------
+redis-cache:
+  enabled: true
+  auth:
+    password: t4Ph722qJ5QHeQ1qfu36
+  master:
+    persistence:
+      enabled: false
+    configuration: "appendonly no"
+  replica:
+    replicaCount: 0
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# -- Data Population Job ------------------------------------------------------
+populate:
+  enabled: true
+  image:
+    repository: python
+    tag: "3.12-slim"
+
+# -- kube-prometheus-stack (subchart) ------------------------------------------
+kube-prometheus-stack:
+  enabled: true
+  prometheus:
+    prometheusSpec:
+      retention: 15d
+      serviceMonitorSelectorNilUsesHelmValues: false
+      ruleSelectorNilUsesHelmValues: false
+  grafana:
+    enabled: true
+    adminUser: admin
+    adminPassword: admin
+    sidecar:
+      dashboards:
+        enabled: true
+        label: grafana_dashboard
+    service:
+      type: ClusterIP
+  alertmanager:
+    enabled: true

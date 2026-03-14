@@ -1,0 +1,121 @@
+# =============================================================================
+# NetBox Lab - Minikube Overrides (optimized for 8GB host / 3GB minikube)
+# =============================================================================
+
+netbox:
+  service:
+    type: NodePort
+    nodePort: 30080
+  ingress:
+    enabled: false
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1536Mi
+  persistence:
+    media:
+      storageClass: standard
+    reports:
+      storageClass: standard
+    scripts:
+      storageClass: standard
+
+worker:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+postgresql:
+  image:
+    tag: latest
+  metrics:
+    enabled: false
+    image:
+      tag: latest
+  primary:
+    persistence:
+      storageClass: standard
+      size: 5Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 384Mi
+
+redis-tasks:
+  image:
+    tag: latest
+  metrics:
+    enabled: false
+    image:
+      tag: latest
+  master:
+    persistence:
+      storageClass: standard
+      size: 1Gi
+    resources:
+      requests:
+        cpu: 25m
+        memory: 32Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
+redis-cache:
+  image:
+    tag: latest
+  metrics:
+    enabled: false
+    image:
+      tag: latest
+  master:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 32Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
+kube-prometheus-stack:
+  # Disable heavy monitoring components for low-memory minikube
+  alertmanager:
+    enabled: false
+  prometheus:
+    prometheusSpec:
+      retention: 3d
+      resources:
+        requests:
+          cpu: 50m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+    service:
+      type: NodePort
+      nodePort: 30909
+  grafana:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+    service:
+      type: NodePort
+      nodePort: 30300
+  # Disable node-exporter and kube-state-metrics to save memory
+  prometheus-node-exporter:
+    enabled: false
+  kubeStateMetrics:
+    enabled: false

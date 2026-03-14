@@ -1,0 +1,17 @@
+{{- if index .Values "kube-prometheus-stack" "enabled" }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "netbox-lab.fullname" . }}-netbox
+  labels:
+    {{- include "netbox-lab.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "netbox-lab.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: netbox
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+{{- end }}

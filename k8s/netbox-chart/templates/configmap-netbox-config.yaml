@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "netbox-lab.fullname" . }}-netbox-config
+  labels:
+    {{- include "netbox-lab.labels" . | nindent 4 }}
+data:
+  extra.py: |
+    ####
+    ## This file contains extra configuration options that can't be configured
+    ## directly through environment variables.
+    ####
+
+  logging.py: |
+    # Logging configuration (uncomment to enable)
+
+  plugins.py: |
+    # Add your plugins and plugin settings here.

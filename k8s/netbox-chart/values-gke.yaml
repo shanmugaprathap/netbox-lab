@@ -1,0 +1,83 @@
+# =============================================================================
+# NetBox Lab - GKE Production Overrides
+# =============================================================================
+
+netbox:
+  replicaCount: 2
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: true
+    className: gce
+    annotations:
+      kubernetes.io/ingress.global-static-ip-name: netbox-ip
+    hosts:
+      - host: netbox.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: netbox-tls
+        hosts:
+          - netbox.example.com
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  persistence:
+    media:
+      storageClass: standard-rwo
+      size: 20Gi
+    reports:
+      storageClass: standard-rwo
+      size: 5Gi
+    scripts:
+      storageClass: standard-rwo
+      size: 5Gi
+
+worker:
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+postgresql:
+  primary:
+    persistence:
+      storageClass: standard-rwo
+      size: 50Gi
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+redis-tasks:
+  master:
+    persistence:
+      storageClass: standard-rwo
+      size: 5Gi
+
+kube-prometheus-stack:
+  prometheus:
+    prometheusSpec:
+      retention: 30d
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: standard-rwo
+            resources:
+              requests:
+                storage: 50Gi
+  grafana:
+    ingress:
+      enabled: true
+      ingressClassName: gce
+      hosts:
+        - grafana.example.com

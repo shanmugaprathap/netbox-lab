@@ -1,0 +1,171 @@
+{{- if index .Values "kube-prometheus-stack" "enabled" }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "netbox-lab.fullname" . }}-alerts
+  labels:
+    {{- include "netbox-lab.labels" . | nindent 4 }}
+spec:
+  groups:
+    # ---- Pod / Container Alerts (adapted from Docker cAdvisor to K8s) --------
+    - name: netbox.pod_alerts
+      rules:
+        - alert: PodRestarted
+          expr: |
+            increase(kube_pod_container_status_restarts_total{
+              namespace="{{ .Release.Namespace }}",
+              container=~"netbox|worker"
+            }[5m]) > 0
+          for: 0m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pod {{ "{{" }} $labels.pod {{ "}}" }} restarted"
+            description: "Pod {{ "{{" }} $labels.pod {{ "}}" }} in namespace {{ "{{" }} $labels.namespace {{ "}}" }} was restarted."
+
+        - alert: ContainerHighMemory
+          expr: |
+            (container_memory_working_set_bytes{
+              namespace="{{ .Release.Namespace }}",
+              container=~"netbox|worker"
+            }
+            / on(namespace, pod, container) kube_pod_container_resource_limits{
+              namespace="{{ .Release.Namespace }}",
+              resource="memory"
+            }) * 100 > 80
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High memory usage on {{ "{{" }} $labels.pod {{ "}}" }}"
+            description: "Container {{ "{{" }} $labels.container {{ "}}" }} memory usage is above 80% (current: {{ "{{" }} $value | printf \"%.1f\" {{ "}}" }}%)."
+
+        - alert: ContainerMemoryAbsolute
+          expr: |
+            container_memory_working_set_bytes{
+              namespace="{{ .Release.Namespace }}",
+              container=~"netbox|worker"
+            } > 500 * 1024 * 1024
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Container {{ "{{" }} $labels.container {{ "}}" }} using >500MB memory"
+            description: "Container {{ "{{" }} $labels.container {{ "}}" }} in pod {{ "{{" }} $labels.pod {{ "}}" }} is using {{ "{{" }} $value | humanize {{ "}}" }} of memory."
+
+        - alert: ContainerHighCPU
+          expr: |
+            rate(container_cpu_usage_seconds_total{
+              namespace="{{ .Release.Namespace }}",
+              container=~"netbox|worker"
+            }[5m]) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High CPU usage on {{ "{{" }} $labels.pod {{ "}}" }}"
+            description: "Container {{ "{{" }} $labels.container {{ "}}" }} CPU usage is above 80% for 5 minutes."
+
+        - alert: NetBoxPodDown
+          expr: |
+            kube_pod_status_ready{
+              namespace="{{ .Release.Namespace }}",
+              pod=~".*netbox.*"
+            } == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "NetBox pod is not ready"
+            description: "Pod {{ "{{" }} $labels.pod {{ "}}" }} is not in Ready state."
+
+    # ---- PostgreSQL Alerts ---------------------------------------------------
+    - name: netbox.postgres_alerts
+      rules:
+        - alert: PostgresTooManyConnections
+          expr: pg_stat_activity_count > 80
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PostgreSQL has too many connections"
+            description: "PostgreSQL currently has {{ "{{" }} $value {{ "}}" }} active connections."
+
+        - alert: PostgresDown
+          expr: pg_up == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "PostgreSQL is down"
+            description: "PostgreSQL exporter cannot connect to the database."
+
+        - alert: PostgresSlowQueries
+          expr: pg_stat_activity_max_tx_duration{datname="netbox"} > 300
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Long-running PostgreSQL query detected"
+            description: "A query has been running for more than 5 minutes in the netbox database."
+
+        - alert: PostgresDatabaseGrowth
+          expr: rate(pg_database_size_bytes{datname="netbox"}[1h]) > 0.1 * pg_database_size_bytes{datname="netbox"}
+          for: 5m
+          labels:
+            severity: info
+          annotations:
+            summary: "NetBox database growing rapidly"
+            description: "The NetBox database size is increasing faster than 10% per hour."
+
+    # ---- Redis Alerts --------------------------------------------------------
+    - name: netbox.redis_alerts
+      rules:
+        - alert: RedisDown
+          expr: redis_up == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Redis is down"
+            description: "Redis exporter cannot connect to the Redis instance."
+
+        - alert: RedisHighMemory
+          expr: redis_memory_used_bytes > 256 * 1024 * 1024
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Redis high memory usage"
+            description: "Redis is using {{ "{{" }} $value | humanize {{ "}}" }} of memory."
+
+        - alert: RedisHighClients
+          expr: redis_connected_clients > 100
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Redis has too many connected clients"
+            description: "Redis currently has {{ "{{" }} $value {{ "}}" }} connected clients."
+
+        - alert: RedisRejectedConnections
+          expr: increase(redis_rejected_connections_total[5m]) > 0
+          for: 0m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Redis is rejecting connections"
+            description: "Redis has rejected {{ "{{" }} $value {{ "}}" }} connections in the last 5 minutes."
+
+    # ---- Scrape Alerts -------------------------------------------------------
+    - name: netbox.scrape_alerts
+      rules:
+        - alert: TargetDown
+          expr: up{namespace="{{ .Release.Namespace }}"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Scrape target {{ "{{" }} $labels.job {{ "}}" }} is down"
+            description: "Prometheus cannot scrape {{ "{{" }} $labels.instance {{ "}}" }} (job: {{ "{{" }} $labels.job {{ "}}" }})."
+{{- end }}

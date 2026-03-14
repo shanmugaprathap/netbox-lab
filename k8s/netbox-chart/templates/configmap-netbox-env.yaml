@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "netbox-lab.fullname" . }}-netbox-env
+  labels:
+    {{- include "netbox-lab.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.netbox.env }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  # Database
+  DB_HOST: {{ include "netbox-lab.postgresql.host" . | quote }}
+  DB_NAME: {{ .Values.postgresql.auth.database | quote }}
+  DB_USER: {{ .Values.postgresql.auth.username | quote }}
+  # Redis Tasks
+  REDIS_HOST: {{ include "netbox-lab.redis-tasks.host" . | quote }}
+  REDIS_DATABASE: "0"
+  REDIS_SSL: "false"
+  REDIS_INSECURE_SKIP_TLS_VERIFY: "false"
+  # Redis Cache
+  REDIS_CACHE_HOST: {{ include "netbox-lab.redis-cache.host" . | quote }}
+  REDIS_CACHE_DATABASE: "1"
+  REDIS_CACHE_SSL: "false"
+  REDIS_CACHE_INSECURE_SKIP_TLS_VERIFY: "false"
+  # Email (defaults)
+  EMAIL_SERVER: "localhost"
+  EMAIL_PORT: "25"
+  EMAIL_FROM: "netbox@bar.com"
+  EMAIL_USE_SSL: "false"
+  EMAIL_USE_TLS: "false"
+  EMAIL_TIMEOUT: "5"
+  EMAIL_USERNAME: "netbox"
+  # Media
+  MEDIA_ROOT: "/opt/netbox/netbox/media"
+  # Superuser
+  SUPERUSER_NAME: {{ .Values.netbox.superuser.name | quote }}
+  SUPERUSER_EMAIL: {{ .Values.netbox.superuser.email | quote }}
